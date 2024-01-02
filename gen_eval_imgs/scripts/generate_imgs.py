@@ -72,8 +72,36 @@ def create_folder_if_not_exists(folder_path):
         os.makedirs(folder_path)
         print(f"文件夹 {folder_path} 创建成功")
     else:
-        print(f"文件夹 {folder_path} 已经存在")
+        print(f"文件夹 {folder_path} 已经存在") 
 
+
+def extract_index_dir(image_path):
+    index = image_path.split('/')[-1]
+    return int(index)
+
+
+def gen_from_last(image_dir, pattern = "seed42", nums = 10):
+    image_index_dirs = sorted(os.listdir(image_dir), key=lambda x: int(x))
+    image_index_dirs = [os.path.join(image_dir, img_dir) for img_dir in image_index_dirs]
+
+    for image_dir in image_index_dirs:
+        images = os.listdir(image_dir)
+        pattern_count = 0
+
+        for image_name in images:
+            if pattern in image_name:
+                pattern_count += 1
+        
+        if pattern_count < nums:
+            print(f"从 {image_dir} 开始下载……")
+            break
+
+    # print(extract_index_dir(image_dir))
+    return extract_index_dir(image_dir)
+                
+    
+
+    
 
 
 
@@ -204,17 +232,24 @@ def generate_images(args):
     
     model = StableDiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, torch_dtype=torch.float16)
     model.to(device)
-    global_step = 0
-    progress_bar = tqdm(range(global_step, dataloader_length))
-    progress_bar.set_description("Generating Images……")
 
+    # append judge：generate from last
+    pattern = f"seed{args.seed}"
+    step_start = gen_from_last(args.img_save_dir, pattern=pattern, nums = 10)
+    
+    progress_bar = tqdm(range(step_start, dataloader_length))
+    progress_bar.set_description("Generating Images……")
 
     # 4. aplly  prompt pair (complex-simple) to generate images
     json_data = []
     for step ,batch in enumerate(data_loader):
+        # gen from last
+        if step + 1 < step_start:
+            continue
+        
         ids = batch["id"]
         prompts = batch["text"]
-        
+
         # print(prompts)
         # # b. generate images
         # 返回的是存储图像地址的 list
@@ -269,7 +304,7 @@ if __name__ =="__main__":
         default="/home/khf/liutao/sd1-4",
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
-    parser.add_argument("--seed", type=int, default=8888, help="A seed for reproducible inferencing.")
+    parser.add_argument("--seed", type=int, default=42, help="A seed for reproducible inferencing.")
     parser.add_argument(
         "--prompt_json_path",
         default="/media/sdb/liutao/refl_base/ImageReward/data/refl_data_v2.json",
@@ -314,5 +349,7 @@ if __name__ =="__main__":
 
 
     generate_images(args)
+    # gen_from_last(args.img_save_dir)
+    # extract_index_dir("/media/sdb/liutao/datasets/rm_images/images/6749")
             
 
